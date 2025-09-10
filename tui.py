@@ -27,8 +27,19 @@ class ItemForm(ModalScreen):
         yield Input(value=self.item.get("name", ""), placeholder="Name", id="name")
         categories = inventory.list_categories()
         options = [(c["name"], str(c["id"])) for c in categories]
-        default = str(self.item.get("category_id", "")) if self.item.get("category_id") else None
-        yield Select(options=options, value=default, id="category_id")
+        default = (
+            str(self.item.get("category_id", ""))
+            if self.item.get("category_id")
+            else None
+        )
+        select_kwargs = {
+            "options": options,
+            "id": "category_id",
+            "allow_blank": True,
+        }
+        if default is not None:
+            select_kwargs["value"] = default
+        yield Select(**select_kwargs)
         yield Input(value=str(self.item.get("anzahl", "")), placeholder="Anzahl", id="anzahl")
         yield Input(value=self.item.get("status", ""), placeholder="Status", id="status")
         yield Input(value=self.item.get("ort", "") or "", placeholder="Ort", id="ort")
@@ -136,7 +147,7 @@ class InventoryApp(App):
         if table.cursor_row is None:
             status.update("Kein Artikel gewählt")
             return
-        item_id = int(table.row_keys[table.cursor_row])
+        item_id = int(table.get_row_at(table.cursor_row).key)
         inventory.remove_item_by_id(item_id)
         self.refresh_table()
         status.update("Artikel gelöscht")
@@ -207,7 +218,7 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = int(table.row_keys[table.cursor_row])
+            item_id = int(table.get_row_at(table.cursor_row).key)
             item = inventory.get_item(item_id)
             data = await self.push_screen(ItemForm(item))
             if data:
@@ -219,7 +230,7 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = int(table.row_keys[table.cursor_row])
+            item_id = int(table.get_row_at(table.cursor_row).key)
             inventory.remove_item_by_id(item_id)
             self.refresh_table()
             status.update("Artikel gelöscht")
@@ -228,7 +239,7 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = int(table.row_keys[table.cursor_row])
+            item_id = int(table.get_row_at(table.cursor_row).key)
             self.show_details(item_id)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
