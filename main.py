@@ -1,6 +1,7 @@
 import argparse
 from database.db import init_db, export_db, import_db
 from modules import inventory
+import tui
 
 VERSION = "0.1"
 
@@ -35,6 +36,11 @@ def import_command(args):
     print(f"Datenbank aus {args.file} importiert")
 
 
+def tui_command(_):
+    init_db()
+    tui.main()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CLI Warenwirtschaftssystem")
     parser.add_argument("--version", action="version", version=VERSION)
@@ -63,9 +69,13 @@ def main() -> None:
     import_parser.add_argument("--file", required=True, help="Quelldatei")
     import_parser.set_defaults(func=import_command)
 
+    tui_parser = subparsers.add_parser("tui", help="Textoberfläche starten")
+    tui_parser.set_defaults(command="tui", func=tui_command)
+
     args = parser.parse_args()
     if hasattr(args, "func"):
-        init_db()
+        if args.command != "tui":
+            init_db()
         args.func(args)
     else:
         parser.print_help()

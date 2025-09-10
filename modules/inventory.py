@@ -112,3 +112,67 @@ def remove_item(item_id: str) -> None:
     else:
         print("Abgebrochen.")
     conn.close()
+
+
+# Backend-Funktionen für die TUI
+
+def list_items() -> list:
+    """Gibt alle Artikel als Liste von Zeilen zurück."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM items ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_item(item_id: str) -> Optional[dict]:
+    """Liefert einen Artikel als Dictionary oder ``None``."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_item(data: dict) -> None:
+    """Fügt einen neuen Artikel mit den übergebenen Daten hinzu."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO items (id, name, kategorie, anzahl, status, eingesetzt, notiz) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            data["id"],
+            data["name"],
+            data["kategorie"],
+            int(data["anzahl"]),
+            data["status"],
+            data.get("eingesetzt"),
+            data.get("notiz"),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_item_fields(item_id: str, data: dict) -> None:
+    """Aktualisiert die angegebenen Felder eines Artikels."""
+    if not data:
+        return
+    conn = get_connection()
+    cur = conn.cursor()
+    fields = ", ".join(f"{k}=?" for k in data.keys())
+    values = list(data.values()) + [item_id]
+    cur.execute(f"UPDATE items SET {fields} WHERE id=?", values)
+    conn.commit()
+    conn.close()
+
+
+def remove_item_by_id(item_id: str) -> None:
+    """Löscht einen Artikel anhand seiner ID."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM items WHERE id=?", (item_id,))
+    conn.commit()
+    conn.close()
