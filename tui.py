@@ -66,6 +66,9 @@ class InventoryApp(App):
         ("q", "quit", "Quit"),
         ("tab", "switch_focus", "Switch"),
         ("ctrl+f", "focus_search", "Search"),
+        ("f5", "refresh", "Refresh"),
+        ("delete", "delete_item", "Delete"),
+        ("ctrl+n", "new_item", "New"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -104,6 +107,33 @@ class InventoryApp(App):
 
     def action_focus_search(self) -> None:
         self.set_focus(self.query_one("#search", Input))
+
+    def action_refresh(self) -> None:
+        """Refresh the table contents."""
+        self.refresh_table()
+        status = self.query_one("#status", Static)
+        status.update("Tabelle aktualisiert")
+
+    def action_delete_item(self) -> None:
+        """Delete the currently selected item."""
+        table = self.query_one(DataTable)
+        status = self.query_one("#status", Static)
+        if table.cursor_row is None:
+            status.update("Kein Artikel gewählt")
+            return
+        item_id = int(table.row_keys[table.cursor_row])
+        inventory.remove_item_by_id(item_id)
+        self.refresh_table()
+        status.update("Artikel gelöscht")
+
+    async def action_new_item(self) -> None:
+        """Open the form to add a new item."""
+        status = self.query_one("#status", Static)
+        data = await self.push_screen(ItemForm())
+        if data:
+            inventory.add_item(data)
+            self.refresh_table()
+            status.update("Artikel hinzugefügt")
 
     def show_details(self, item_id: str) -> None:
         detail = self.query_one("#detail", Static)
