@@ -66,6 +66,36 @@ def search_command(args):
     print(tabulate(results, headers="keys", tablefmt="github"))
 
 
+def advanced_search_command(args):
+    """Advanced FTS search with examples."""
+    if not args.query:
+        print("FTS Search Examples:")
+        print('  python main.py fts "exact phrase"')
+        print("  python main.py fts 'ESP32 OR Arduino'")
+        print("  python main.py fts 'mikro* AND sensor'")
+        print("  python main.py fts 'NOT defekt'")
+        return
+
+    results = inventory.search_items_fts(args.query)
+    if not results:
+        print(f"No FTS results for: {args.query}")
+        print("Trying fallback search...")
+        results = inventory.search_items_like(args.query)
+
+    if not results:
+        print("No results found.")
+        return
+
+    try:
+        from tabulate import tabulate
+        print(f"Found {len(results)} results:")
+        headers = list(results[0].keys())
+        print(tabulate(results, headers=headers, tablefmt="github"))
+    except ImportError:
+        for item in results:
+            print(f"ID {item['id']}: {item['name']} ({item['kategorie']})")
+
+
 def filter_command(args):
     items = inventory.get_items_by_filter(args.category, args.status)
     if not items:
@@ -127,6 +157,11 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Artikel suchen")
     search_parser.add_argument("term", help="Suchbegriff")
     search_parser.set_defaults(func=search_command)
+
+    # Advanced FTS search
+    fts_parser = subparsers.add_parser("fts", help="Advanced full-text search")
+    fts_parser.add_argument("query", nargs="?", help="FTS query (use quotes for phrases)")
+    fts_parser.set_defaults(func=advanced_search_command)
 
     filter_parser = subparsers.add_parser("filter", help="Artikel filtern")
     filter_parser.add_argument("--category", help="Nach Kategorie filtern")

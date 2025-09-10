@@ -22,6 +22,9 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     if version < 2:
         _migrate_to_v2(conn)
         cur.execute("PRAGMA user_version = 2")
+    if version < 3:
+        _migrate_to_v3(conn)
+        cur.execute("PRAGMA user_version = 3")
     conn.commit()
 
 
@@ -76,5 +79,61 @@ def _migrate_to_v2(conn: sqlite3.Connection) -> None:
                 "UPDATE items SET category_id=? WHERE kategorie=?",
                 (cat_id, name),
             )
+
+    conn.commit()
+
+
+def _migrate_to_v3(conn: sqlite3.Connection) -> None:
+    """Add FTS5 virtual table for full-text search."""
+    cur = conn.cursor()
+
+    # Create FTS virtual table
+    cur.execute(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+            name, kategorie, ort, notiz,
+            content='items',
+            content_rowid='id',
+            tokenize='porter'
+        )
+        """
+    )
+
+    # Index existing data
+    cur.execute(
+        """
+        INSERT INTO items_fts(rowid, name, kategorie, ort, notiz)
+        SELECT id, name, kategorie, ort, notiz FROM items
+        WHERE name IS NOT NULL
+        """
+    )
+
+    # Create triggers to keep FTS in sync
+    cur.execute(
+        """
+        CREATE TRIGGER items_fts_insert AFTER INSERT ON items BEGIN
+            INSERT INTO items_fts(rowid, name, kategorie, ort, notiz)
+            VALUES (NEW.id, NEW.name, NEW.kategorie, NEW.ort, NEW.notiz);
+        END
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TRIGGER items_fts_delete AFTER DELETE ON items BEGIN
+            DELETE FROM items_fts WHERE rowid = OLD.id;
+        END
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TRIGGER items_fts_update AFTER UPDATE ON items BEGIN
+            DELETE FROM items_fts WHERE rowid = OLD.id;
+            INSERT INTO items_fts(rowid, name, kategorie, ort, notiz)
+            VALUES (NEW.id, NEW.name, NEW.kategorie, NEW.ort, NEW.notiz);
+        END
+        """
+    )
 
     conn.commit()

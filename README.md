@@ -21,6 +21,28 @@ Die benötigten Pakete `textual` und `tabulate` werden beim ersten Start automat
 - `python main.py remove <ID>` – Artikel löschen
 - `python main.py tui` – Textoberfläche starten
 
+## Advanced Search
+
+The system supports powerful full-text search with these features:
+
+### Basic Search
+- `ESP32` - finds items containing "ESP32"
+- `sensor` - finds all sensor-related items
+
+### Advanced Syntax
+- `"Arduino Nano"` - exact phrase search
+- `ESP32 OR Arduino` - boolean OR
+- `mikro* AND sensor` - wildcards with boolean AND  
+- `NOT defekt` - exclude items with "defekt"
+- `kategorie:MCU` - search specific fields (future)
+
+### CLI Examples
+```bash
+python main.py search "ESP32"           # Basic search
+python main.py fts "ESP32 OR Arduino"   # Advanced FTS
+python main.py fts "mikro*"             # Wildcard search
+```
+
 ## TUI
 
 ```
