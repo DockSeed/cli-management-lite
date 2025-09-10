@@ -25,6 +25,9 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     if version < 3:
         _migrate_to_v3(conn)
         cur.execute("PRAGMA user_version = 3")
+    if version < 4:
+        _migrate_to_v4(conn)
+        cur.execute("PRAGMA user_version = 4")
     conn.commit()
 
 
@@ -135,5 +138,23 @@ def _migrate_to_v3(conn: sqlite3.Connection) -> None:
         END
         """
     )
+
+    conn.commit()
+
+
+def _migrate_to_v4(conn: sqlite3.Connection) -> None:
+    """Start item IDs at ``100000`` for professional six-digit numbering."""
+    cur = conn.cursor()
+
+    cur.execute("SELECT MAX(id) FROM items")
+    max_id = cur.fetchone()[0]
+
+    if max_id is None or max_id < 100000:
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO sqlite_sequence (name, seq)
+            VALUES ('items', 99999)
+            """
+        )
 
     conn.commit()
