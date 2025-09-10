@@ -170,11 +170,15 @@ def remove_item(item_id: int) -> None:
 
 # --- Backend-Funktionen für die TUI --------------------------------------------
 
-def list_items() -> list[Any]:
-    """Gibt alle Artikel sortiert nach ID zurück."""
+def list_items(sort_by: str = "id", descending: bool = False) -> list[Any]:
+    """Gibt alle Artikel sortiert nach ``sort_by`` zurück."""
+    allowed = {"id", "name", "status", "kategorie"}
+    if sort_by not in allowed:
+        sort_by = "id"
+    order = "DESC" if descending else "ASC"
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM items ORDER BY id")
+    cur.execute(f"SELECT * FROM items ORDER BY {sort_by} {order}")
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -192,9 +196,19 @@ def get_item(item_id: int) -> Optional[dict[str, Any]]:
 
 def add_item(data: dict[str, Any]) -> int:
     """Fügt einen neuen Artikel hinzu und gibt die ID zurück."""
+    category_id = int(data["category_id"])
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM categories WHERE id=?", (category_id,))
+    row = cur.fetchone()
+    if not row:
+        raise ValueError("Kategorie existiert nicht")
+    category_name = row["name"]
+
     validated = {
         "name": ItemValidator.validate_name(data["name"]),
-        "kategorie": data["kategorie"],
+        "kategorie": category_name,
+        "category_id": category_id,
         "anzahl": ItemValidator.validate_amount(str(data["anzahl"])),
         "status": ItemValidator.validate_status(data["status"]),
         "ort": data.get("ort"),
@@ -204,17 +218,16 @@ def add_item(data: dict[str, Any]) -> int:
             data.get("datum_eingetroffen", "")
         ) or None,
     }
-    conn = get_connection()
-    cur = conn.cursor()
     cur.execute(
         """
         INSERT INTO items
-            (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (name, kategorie, category_id, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             validated["name"],
             validated["kategorie"],
+            validated["category_id"],
             validated["anzahl"],
             validated["status"],
             validated["ort"],
@@ -237,6 +250,18 @@ def update_item_fields(item_id: int, data: dict[str, Any]) -> None:
     cur = conn.cursor()
     fields = []
     values: list[Any] = []
+
+    category_id = data.pop("category_id", None)
+    if category_id is not None:
+        category_id = int(category_id)
+        cur.execute("SELECT name FROM categories WHERE id=?", (category_id,))
+        row = cur.fetchone()
+        if row:
+            fields.append("category_id=?")
+            values.append(category_id)
+            fields.append("kategorie=?")
+            values.append(row["name"])
+
     for key, value in data.items():
         if key == "anzahl" and value is not None:
             value = ItemValidator.validate_amount(str(value))
@@ -306,11 +331,22 @@ def get_items_by_filter(kategorie: str | None = None, status: str | None = None)
     return [dict(row) for row in rows]
 
 
-def get_categories() -> list[dict]:
-    """Alle Kategorien laden (distinct Werte der Spalte ``kategorie``)."""
+def list_categories() -> list[dict]:
+    """Alle Kategorien laden."""
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT DISTINCT kategorie AS name FROM items ORDER BY name")
+    cur.execute("SELECT id, name FROM categories ORDER BY name")
     rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def add_category(name: str) -> int:
+    """Neue Kategorie anlegen und ID zurückgeben."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO categories (name) VALUES (?)", (name,))
+    conn.commit()
+    cat_id = cur.lastrowid
+    conn.close()
+    return cat_id

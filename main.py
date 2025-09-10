@@ -79,6 +79,20 @@ def filter_command(args):
     print(tabulate(items, headers="keys", tablefmt="github"))
 
 
+def categories_list_command(_):
+    cats = inventory.list_categories()
+    if not cats:
+        print("Keine Kategorien")
+        return
+    for cat in cats:
+        print(f"{cat['id']}: {cat['name']}")
+
+
+def categories_add_command(args):
+    cat_id = inventory.add_category(args.name)
+    print(f"Kategorie '{args.name}' angelegt (ID {cat_id})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CLI Warenwirtschaftssystem")
     parser.add_argument("--version", action="version", version=VERSION)
@@ -118,6 +132,16 @@ def main() -> None:
     filter_parser.add_argument("--category", help="Nach Kategorie filtern")
     filter_parser.add_argument("--status", help="Nach Status filtern")
     filter_parser.set_defaults(func=filter_command)
+
+    categories_parser = subparsers.add_parser("categories", help="Kategorien verwalten")
+    cat_sub = categories_parser.add_subparsers(dest="cat_cmd")
+
+    cat_list = cat_sub.add_parser("list", help="Kategorien auflisten")
+    cat_list.set_defaults(func=categories_list_command)
+
+    cat_add = cat_sub.add_parser("add", help="Kategorie hinzufügen")
+    cat_add.add_argument("name", help="Kategoriename")
+    cat_add.set_defaults(func=categories_add_command)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
