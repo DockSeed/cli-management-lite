@@ -1,6 +1,11 @@
 from pathlib import Path
 import shutil
 import sqlite3
+import time
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 # Pfad zur SQLite-Datenbank
@@ -46,12 +51,28 @@ def export_db(dest: str) -> None:
 def import_db(src: str) -> None:
     """Import a database from ``src`` replacing the current file.
 
-    The existing database is backed up with the suffix ``.bak`` before it is
-    replaced.
+    Validates that ``src`` is a SQLite database and restores the previous
+    database on failure.
     """
     src_path = Path(src)
     if not src_path.exists():
         raise FileNotFoundError(f"Quelle {src} existiert nicht")
+
+    # Validate SQLite file
+    try:
+        test_conn = sqlite3.connect(src_path)
+        test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        test_conn.close()
+    except sqlite3.Error as exc:
+        raise ValueError("Datei ist keine gültige SQLite-Datenbank") from exc
+
+    backup_path = None
     if DB_PATH.exists():
-        shutil.copy(DB_PATH, DB_PATH.with_suffix(".bak"))
-    shutil.copy(src_path, DB_PATH)
+        backup_path = DB_PATH.with_suffix(f".bak.{int(time.time())}")
+        shutil.copy(DB_PATH, backup_path)
+    try:
+        shutil.copy(src_path, DB_PATH)
+    except Exception as exc:
+        if backup_path and backup_path.exists():
+            shutil.copy(backup_path, DB_PATH)
+        raise RuntimeError(f"Import fehlgeschlagen: {exc}") from exc

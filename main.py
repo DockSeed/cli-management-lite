@@ -1,23 +1,8 @@
 import argparse
-import importlib
-import subprocess
 import sys
-
-
-def ensure_dependencies() -> None:
-    """Install benötigte Pakete automatisch, falls sie fehlen."""
-    for package in ("textual", "tabulate"):
-        try:
-            importlib.import_module(package)
-        except ImportError:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-
-ensure_dependencies()
 
 from database.db import init_db, export_db, import_db
 from modules import inventory
-import tui
 
 VERSION = "0.1"
 
@@ -48,13 +33,50 @@ def export_command(args):
 
 
 def import_command(args):
-    import_db(args.file)
-    print(f"Datenbank aus {args.file} importiert")
+    try:
+        import_db(args.file)
+        print(f"Datenbank aus {args.file} importiert")
+    except Exception as exc:
+        print(f"Fehler beim Import: {exc}")
 
 
 def tui_command(_):
+    try:
+        import tui
+    except ImportError:
+        print(
+            "Das Paket 'textual' ist nicht installiert. "
+            "Installieren Sie es mit 'pip install textual'."
+        )
+        return
     init_db()
     tui.main()
+
+
+def search_command(args):
+    results = inventory.search_items(args.term)
+    if not results:
+        print("Keine Artikel gefunden.")
+        return
+    try:
+        from tabulate import tabulate
+    except ImportError:
+        print(results)
+        return
+    print(tabulate(results, headers="keys", tablefmt="github"))
+
+
+def filter_command(args):
+    items = inventory.get_items_by_filter(args.category, args.status)
+    if not items:
+        print("Keine Artikel gefunden.")
+        return
+    try:
+        from tabulate import tabulate
+    except ImportError:
+        print(items)
+        return
+    print(tabulate(items, headers="keys", tablefmt="github"))
 
 
 def main() -> None:
@@ -87,6 +109,15 @@ def main() -> None:
 
     tui_parser = subparsers.add_parser("tui", help="Textoberfläche starten")
     tui_parser.set_defaults(command="tui", func=tui_command)
+
+    search_parser = subparsers.add_parser("search", help="Artikel suchen")
+    search_parser.add_argument("term", help="Suchbegriff")
+    search_parser.set_defaults(func=search_command)
+
+    filter_parser = subparsers.add_parser("filter", help="Artikel filtern")
+    filter_parser.add_argument("--category", help="Nach Kategorie filtern")
+    filter_parser.add_argument("--status", help="Nach Status filtern")
+    filter_parser.set_defaults(func=filter_command)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
