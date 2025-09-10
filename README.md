@@ -40,7 +40,7 @@ Die benötigten Pakete `textual` und `tabulate` werden beim ersten Start automat
 Status: [↑↓] Navigieren | [Tab] Wechseln | [Enter] Ausführen | [q] Beenden
 ```
 
-Die TUI synchronisiert die Artikelliste mit der Detailansicht. Navigation erfolgt mit den Pfeiltasten, `Tab` wechselt den Fokus, `Enter` führt Aktionen aus, `q` beendet.
+Die TUI synchronisiert die Artikelliste mit der Detailansicht. Oberhalb der Tabelle befindet sich ein Suchfeld zur Live-Filterung. Navigation erfolgt mit den Pfeiltasten, `Tab` wechselt den Fokus, `Enter` führt Aktionen aus, `Ctrl+F` fokussiert die Suche, `q` beendet.
 
 ## Lizenz
 

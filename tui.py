@@ -54,16 +54,18 @@ class InventoryApp(App):
     """Einfache TUI für das Inventar."""
 
     CSS = """
-    Screen { layout: grid; grid-size: 2 2; grid-rows: 1fr 6; grid-columns: 25 1fr; }
+    Screen { layout: grid; grid-size: 2 3; grid-rows: 1fr 3 6; grid-columns: 25 1fr; }
     #menu { grid-row: 1; grid-column: 1; }
     #detail { grid-row: 1; grid-column: 2; }
-    #table { grid-row: 2; grid-column: 1 / span 2; height: 8; }
+    #search { grid-row: 2; grid-column: 1 / span 2; }
+    #table { grid-row: 3; grid-column: 1 / span 2; height: 8; }
     #status { dock: bottom; height: 1; }
     """
 
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "switch_focus", "Switch"),
+        ("ctrl+f", "focus_search", "Search"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -76,10 +78,12 @@ class InventoryApp(App):
             id="menu",
         )
         detail = Static("", id="detail")
+        search = Input(placeholder="Suche", id="search")
         table = DataTable(id="table")
         status = Static("", id="status")
         yield menu
         yield detail
+        yield search
         yield table
         yield status
 
@@ -89,11 +93,17 @@ class InventoryApp(App):
         self.refresh_table()
         self.set_focus(self.query_one(ListView))
 
-    def refresh_table(self) -> None:
+    def refresh_table(self, search: str = "") -> None:
         table = self.query_one(DataTable)
         table.clear(True)
-        for row in inventory.list_items():
+        rows = (
+            inventory.search_items(search) if search else inventory.list_items()
+        )
+        for row in rows:
             table.add_row(row["id"], row["name"], row["status"], key=row["id"])
+
+    def action_focus_search(self) -> None:
+        self.set_focus(self.query_one("#search", Input))
 
     def show_details(self, item_id: str) -> None:
         detail = self.query_one("#detail", Static)
@@ -111,6 +121,10 @@ class InventoryApp(App):
             self.set_focus(table)
         else:
             self.set_focus(menu)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "search":
+            self.refresh_table(event.value)
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
         choice = event.item.query_one(Label).renderable
