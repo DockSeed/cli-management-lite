@@ -10,6 +10,7 @@ def _migrate_to_v1(cur: sqlite3.Cursor) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             kategorie TEXT NOT NULL,
+            anzahl INTEGER NOT NULL DEFAULT 0,
             status TEXT NOT NULL,
             shop TEXT,
             notiz TEXT,
@@ -134,6 +135,7 @@ def _migrate_to_v5(conn: sqlite3.Connection) -> None:
                 name TEXT NOT NULL,
                 kategorie TEXT NOT NULL,
                 category_id INTEGER REFERENCES categories(id),
+                anzahl INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
                 shop TEXT,
                 notiz TEXT,
@@ -146,9 +148,12 @@ def _migrate_to_v5(conn: sqlite3.Connection) -> None:
         # Kopiere Daten und benenne dabei 'ort' zu 'shop' um
         cur.execute(
             """
-            INSERT INTO items_new 
-            SELECT id, name, kategorie, category_id, anzahl, status, ort, notiz, 
-                   datum_bestellt, datum_eingetroffen 
+            INSERT INTO items_new (
+                id, name, kategorie, category_id, anzahl, status, shop, notiz,
+                datum_bestellt, datum_eingetroffen
+            )
+            SELECT id, name, kategorie, category_id, anzahl, status, ort, notiz,
+                   datum_bestellt, datum_eingetroffen
             FROM items
             """
         )
@@ -160,6 +165,13 @@ def _migrate_to_v5(conn: sqlite3.Connection) -> None:
 def _migrate_to_v6(conn: sqlite3.Connection) -> None:
     """Add stock management tables."""
     cur = conn.cursor()
+    
+    # Ensure legacy quantity column exists for migration compatibility
+    cur.execute("PRAGMA table_info(items)")
+    existing_cols = {row[1] for row in cur.fetchall()}
+    if "anzahl" not in existing_cols:
+        # Add with sane default to avoid failing SELECTs below
+        cur.execute("ALTER TABLE items ADD COLUMN anzahl INTEGER NOT NULL DEFAULT 0")
     
     # Create stock movements table
     cur.execute("""

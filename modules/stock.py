@@ -94,8 +94,9 @@ def get_item_stock(item_id: int) -> dict:
             SELECT 
                 COALESCE(SUM(
                     CASE 
-                        WHEN movement_type IN ('eingang', 'bestellung') THEN quantity
+                        WHEN movement_type = 'eingang' THEN quantity
                         WHEN movement_type IN ('ausgang', 'storno', 'defekt', 'verbaut') THEN -quantity
+                        ELSE 0
                     END
                 ), 0) as current_stock,
                 COALESCE(SUM(
@@ -139,8 +140,9 @@ def get_low_stock_items(threshold: int = 5) -> list:
                 item_id,
                 COALESCE(SUM(
                     CASE 
-                        WHEN movement_type IN ('eingang', 'bestellung') THEN quantity
+                        WHEN movement_type = 'eingang' THEN quantity
                         WHEN movement_type IN ('ausgang', 'storno', 'defekt', 'verbaut') THEN -quantity
+                        ELSE 0
                     END
                 ), 0) as current_stock
             FROM stock_movements

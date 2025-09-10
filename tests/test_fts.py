@@ -6,14 +6,14 @@ import sys
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
-from database.db import DB_PATH, init_db, get_connection
+from modules.db import DB_FILE, init_db, get_connection
 from modules.inventory import search_items_fts
 
 
 def setup_module(module):
     # Ensure a fresh database for testing
-    if DB_PATH.exists():
-        os.remove(DB_PATH)
+    if DB_FILE.exists():
+        os.remove(DB_FILE)
     init_db()
     conn = get_connection()
     cur = conn.cursor()

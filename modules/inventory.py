@@ -443,6 +443,21 @@ def add_item(data: dict) -> int:
     conn = get_connection()
     cur = conn.cursor()
     try:
+        # Ermittele freie ID (kleinste Lccke ab 1, sonst max+1)
+        cur.execute("SELECT id FROM items ORDER BY id")
+        existing_ids = [row[0] for row in cur.fetchall()]
+        if not existing_ids:
+            next_id = 1
+        else:
+            expected = 1
+            next_id = None
+            for rid in existing_ids:
+                if rid > expected:
+                    next_id = expected
+                    break
+                expected = rid + 1
+            if next_id is None:
+                next_id = existing_ids[-1] + 1
         # Prüfe/Setze Kategorie
         if not data.get("category_id"):
             # Standardkategorie
@@ -487,11 +502,12 @@ def add_item(data: dict) -> int:
         cur.execute(
             """
             INSERT INTO items (
-                name, kategorie, category_id, status, shop,
+                id, name, kategorie, category_id, status, shop,
                 notiz, datum_bestellt, datum_eingetroffen
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                next_id,
                 data["name"],
                 data["kategorie"],
                 data["category_id"],
@@ -503,7 +519,7 @@ def add_item(data: dict) -> int:
             ),
         )
         
-        item_id = cur.lastrowid
+        item_id = next_id
         conn.commit()
         return item_id
 
@@ -623,7 +639,7 @@ def search_items_like(search_term: str) -> list[dict]:
         """
         SELECT * FROM items
         WHERE name LIKE ? OR kategorie LIKE ? OR status LIKE ?
-           OR notiz LIKE ? OR ort LIKE ?
+           OR notiz LIKE ? OR shop LIKE ?
         ORDER BY id
         """,
         (pattern, pattern, pattern, pattern, pattern),
@@ -676,3 +692,36 @@ def add_category(name: str) -> int:
     cat_id = cur.lastrowid
     conn.close()
     return cat_id
+
+
+def get_category_items(category_id: int) -> list[dict]:
+    """Gibt eine Liste von Artikeln zurück, die einer Kategorie zugeordnet sind."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, name FROM items WHERE category_id = ? ORDER BY id",
+        (category_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def delete_category(category_id: int) -> None:
+    """Löscht eine Kategorie, wenn keine Artikel verknüpft sind.
+
+    Raises:
+        ValueError: Wenn noch Artikel mit der Kategorie verknüpft sind.
+    """
+    items = get_category_items(category_id)
+    if items:
+        names = ", ".join(f"{it['id']:06d}:{it['name']}" for it in items[:5])
+        more = "" if len(items) <= 5 else f" (+{len(items)-5} weitere)"
+        raise ValueError(
+            f"Kategorie kann nicht gelöscht werden, da noch {len(items)} Artikel verknüpft sind: {names}{more}"
+        )
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM categories WHERE id=?", (category_id,))
+    conn.commit()
+    conn.close()
