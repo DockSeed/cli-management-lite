@@ -623,7 +623,7 @@ def search_items_like(search_term: str) -> list[dict]:
         """
         SELECT * FROM items
         WHERE name LIKE ? OR kategorie LIKE ? OR status LIKE ?
-           OR notiz LIKE ? OR ort LIKE ?
+           OR notiz LIKE ? OR shop LIKE ?
         ORDER BY id
         """,
         (pattern, pattern, pattern, pattern, pattern),
