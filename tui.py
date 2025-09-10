@@ -8,7 +8,6 @@ from textual.widgets import (
     Input,
     Button,
     Select,
-    Horizontal,
 )
 from textual.screen import ModalScreen
 from modules import inventory
