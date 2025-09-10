@@ -2,10 +2,53 @@
 from __future__ import annotations
 
 from typing import Any, Optional
+from datetime import datetime
+from . import db
+from .db import get_connection
 
-from .validators import ItemValidator
+class ItemValidator:
+    @staticmethod
+    def validate_amount(value: str) -> int:
+        try:
+            amount = int(value)
+            if amount < 0:
+                raise ValueError("Anzahl muss positiv sein")
+            if amount > 999999:
+                raise ValueError("Anzahl darf maximal 999999 sein")
+            return amount
+        except ValueError:
+            raise ValueError("Ungültige Anzahl")
 
-from database.db import get_connection
+    @staticmethod
+    def validate_name(value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("Name darf nicht leer sein")
+        return value.strip()
+
+    @staticmethod
+    def validate_status(value: str) -> str:
+        if value not in VALID_STATUS:
+            raise ValueError(f"Status muss einer von {VALID_STATUS} sein")
+        return value
+
+    @staticmethod
+    def validate_date(value: str) -> str:
+        if not value or value == "-":
+            return ""
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+            try:
+                return datetime.strptime(value, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        raise ValueError("Datum muss Format YYYY-MM-DD oder DD.MM.YYYY haben")
+
+VALID_STATUS = [
+    'bestellt',
+    'eingetroffen',
+    'verbaut',
+    'defekt',
+    'nachbestellen'
+]
 
 
 # --- Interaktive CLI-Funktionen -------------------------------------------------
@@ -20,56 +63,174 @@ def _prompt(prompt: str, validator) -> Any:
             print(exc)
 
 
-def add_item_interactive() -> None:
-    """Interaktive Eingabe eines Artikels und Speicherung in der Datenbank."""
-    conn = get_connection()
-    name = _prompt("Name: ", ItemValidator.validate_name)
-    kategorie = input("Kategorie: ")
-    anzahl = _prompt("Anzahl: ", ItemValidator.validate_amount)
-    status = _prompt(
-        "Status (bestellt, eingetroffen, verbaut, defekt): ",
-        ItemValidator.validate_status,
+def validate_int_input(prompt: str, default: int = 1, min_val: int = 1, max_val: int = 999999) -> int:
+    """Validiere Ganzzahleneingabe mit Grenzen."""
+    while True:
+        try:
+            value = input(prompt).strip()
+            if not value:
+                return default
+            num = int(value)
+            if num < min_val:
+                print(f"Wert muss mindestens {min_val} sein")
+                continue
+            if num > max_val:
+                print(f"Wert darf maximal {max_val} sein")
+                continue
+            return num
+        except ValueError:
+            print(f"Bitte eine ganze Zahl zwischen {min_val} und {max_val} eingeben")
+
+
+def add_item_interactive() -> int:
+    """Artikel interaktiv hinzufügen."""
+    name = input("Name: ").strip()
+    if not name:
+        raise ValueError("Name ist pflicht")
+
+    # Kategorien anzeigen
+    print("\nVerfügbare Kategorien:")
+    categories = list_categories()
+    if not categories:
+        add_category("Standard")
+        categories = list_categories()
+    
+    for cat in categories:
+        print(f"{cat['id']}: {cat['name']}")
+    
+    kategorie_input = input("\nKategorie: ").strip()
+    if kategorie_input.isdigit():
+        category_id = int(kategorie_input)
+        # Hole Kategorie-Namen für das Insert
+        for cat in categories:
+            if cat['id'] == category_id:
+                kategorie = cat['name']
+                break
+        else:
+            kategorie = kategorie_input
+            category_id = add_category(kategorie_input)
+    else:
+        # Neue Kategorie anlegen
+        kategorie = kategorie_input
+        category_id = add_category(kategorie_input)
+
+    # Status als nummerierte Liste anzeigen
+    print("\nVerfügbare Status:")
+    for i, status in enumerate(VALID_STATUS, 1):
+        print(f"{i}: {status}")
+    
+    while True:
+        status_input = input("\nStatus (1-5): ").strip()
+        if status_input.isdigit() and 1 <= int(status_input) <= len(VALID_STATUS):
+            status = VALID_STATUS[int(status_input) - 1]
+            break
+        print(f"Bitte eine Zahl zwischen 1 und {len(VALID_STATUS)} eingeben")
+
+    shop = input("Shop (optional): ").strip()
+    notiz = input("Notiz (optional): ").strip()
+    if notiz == "-":
+        notiz = ""
+
+    def get_date(prompt: str) -> str:
+        while True:
+            date = input(prompt).strip()
+            if not date or date == "-":
+                return ""
+            try:
+                for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+                    try:
+                        return datetime.strptime(date, fmt).strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
+                print("Datum muss Format YYYY-MM-DD oder DD.MM.YYYY haben (oder '-' für kein Datum)")
+            except ValueError:
+                if not date:
+                    return ""
+                print("Datum muss Format YYYY-MM-DD oder DD.MM.YYYY haben (oder '-' für kein Datum)")
+
+    datum_bestellt = get_date("Datum bestellt (optional): ")
+    datum_eingetroffen = get_date("Datum eingetroffen (optional): ")
+
+    # Artikel anlegen
+    item_id = add_item({
+        "name": name,
+        "kategorie": kategorie,
+        "category_id": category_id,
+        "status": status,
+        "shop": shop,
+        "notiz": notiz,
+        "datum_bestellt": datum_bestellt,
+        "datum_eingetroffen": datum_eingetroffen,
+    })
+
+    # Initialen Bestand anlegen
+    anzahl = validate_int_input("Menge: ", default=1, min_val=1, max_val=999999)
+    from . import stock
+    movement_type = "bestellung" if status == "bestellt" else "eingang"
+    stock.add_movement(
+        item_id=item_id,
+        movement_type=movement_type,
+        quantity=anzahl,
+        notes=f"Initiale Menge beim Anlegen",
+        reference_date=datum_bestellt if movement_type == "bestellung" else datum_eingetroffen
     )
-    ort = input("Ort (optional): ") or None
-    notiz = input("Notiz (optional): ") or None
-    datum_bestellt = _prompt(
-        "Datum bestellt (optional): ", ItemValidator.validate_date
-    ) or None
-    datum_eingetroffen = _prompt(
-        "Datum eingetroffen (optional): ", ItemValidator.validate_date
-    ) or None
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO items
-            (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen),
-    )
-    conn.commit()
-    conn.close()
-    print("Artikel gespeichert.")
+
+    return item_id
 
 
 def show_all_items() -> None:
-    """Gibt alle Artikel als ASCII-Tabelle aus."""
-    try:
-        from tabulate import tabulate
-    except ImportError:
-        print("Das Paket 'tabulate' ist nicht installiert. Bitte installieren und erneut versuchen.")
+    """Alle Artikel anzeigen."""
+    rows = list_items()
+    if not rows:
+        print("Keine Artikel vorhanden")
         return
 
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, kategorie, anzahl, status FROM items")
-    rows = cur.fetchall()
-    conn.close()
-    if not rows:
-        print("Keine Artikel gefunden.")
-        return
-    table = tabulate(rows, headers="keys", tablefmt="github")
-    print(table)
+    try:
+        from tabulate import tabulate
+        from . import stock
+
+        # Formatierte Daten für die Tabelle vorbereiten
+        formatted_rows = []
+        for row in rows:
+            # Konvertiere sqlite3.Row in dict für einfacheren Zugriff
+            row_dict = dict(zip(row.keys(), row))
+            
+            # Hole Bestandsinfo
+            stock_info = stock.get_item_stock(row_dict['id'])
+            
+            # Kürze lange Texte
+            name = row_dict['name']
+            if len(name) > 20:
+                name = name[:17] + "..."
+            
+            notiz = row_dict.get('notiz', '-')
+            if notiz and len(notiz) > 20:
+                notiz = notiz[:17] + "..."
+
+            formatted_rows.append({
+                'ID': f"{row_dict['id']:06d}",
+                'Name': name,
+                'Kategorie': row_dict.get('kategorie', 'N/A'),
+                'Bestand': stock_info['current_stock'],
+                'Bestellt': stock_info['ordered_quantity'],
+                'Status': row_dict['status'],
+                'Shop': row_dict.get('shop', '-') or '-',
+                'Notiz': notiz or '-'
+            })
+
+        print(tabulate(
+            formatted_rows,
+            headers="keys",
+            tablefmt="grid",
+            numalign="left",
+            stralign="left",
+            maxcolwidths=[8, 20, 15, 8, 8, 12, 15, 20]
+        ))
+    except ImportError:
+        for row in rows:
+            row_dict = dict(zip(row.keys(), row))
+            stock_info = stock.get_item_stock(row_dict['id'])
+            print(f"{row_dict['id']:6d} | {row_dict['name'][:20]} | {row_dict['kategorie']} | Bestand: {stock_info['current_stock']} | {row_dict['status']}")
 
 
 def show_item_by_id(item_id: int) -> None:
@@ -86,66 +247,144 @@ def show_item_by_id(item_id: int) -> None:
         print("Artikel nicht gefunden.")
 
 
+def get_status_from_input(current: str, valid_status: list) -> str:
+    """Status mit Autofill-Funktion ermitteln."""
+    while True:
+        status = input(f"Status [{current}]: ").strip().lower()
+        if not status:
+            return current
+        if status == "-":
+            return current
+        
+        # Exakte Übereinstimmung
+        for v in valid_status:
+            if status == v.lower():
+                return v
+        
+        # Prefix-Match (Autofill)
+        matches = [v for v in valid_status if v.lower().startswith(status)]
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            print(f"Mehrdeutig: {', '.join(matches)}")
+        else:
+            print(f"Status muss einer von {valid_status} sein (oder Anfangsbuchstaben)")
+
+
 def update_item(item_id: int) -> None:
-    """Interaktives Bearbeiten eines Artikels."""
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
-    row = cur.fetchone()
-    if not row:
-        print("Artikel nicht gefunden.")
-        conn.close()
+    """Artikel per ID aktualisieren."""
+    item = get_item(item_id)
+    if not item:
+        print(f"Artikel {item_id} nicht gefunden")
         return
-    print("Leer lassen, um Feld unverändert zu lassen.")
-    name = _prompt(
-        f"Name [{row['name']}]: ",
-        lambda v: ItemValidator.validate_name(v or row["name"]),
-    )
-    kategorie = input(f"Kategorie [{row['kategorie']}]: ") or row["kategorie"]
-    anzahl_input = input(f"Anzahl [{row['anzahl']}]: ")
-    anzahl = (
-        ItemValidator.validate_amount(anzahl_input)
-        if anzahl_input
-        else row["anzahl"]
-    )
-    status = _prompt(
-        f"Status [{row['status']}]: ",
-        lambda v: ItemValidator.validate_status(v or row["status"]),
-    )
-    ort = input(f"Ort [{row['ort'] or ''}]: ") or row["ort"]
-    notiz = input(f"Notiz [{row['notiz'] or ''}]: ") or row["notiz"]
-    datum_bestellt = _prompt(
-        f"Bestellt [{row['datum_bestellt'] or ''}]: ",
-        lambda v: ItemValidator.validate_date(v or row["datum_bestellt"] or "")
-        or row["datum_bestellt"],
-    )
-    datum_eingetroffen = _prompt(
-        f"Eingetroffen [{row['datum_eingetroffen'] or ''}]: ",
-        lambda v: ItemValidator.validate_date(v or row["datum_eingetroffen"] or "")
-        or row["datum_eingetroffen"],
-    )
-    cur.execute(
-        """
-        UPDATE items SET
-            name=?, kategorie=?, anzahl=?, status=?, ort=?, notiz=?,
-            datum_bestellt=?, datum_eingetroffen=?
-        WHERE id=?
-        """,
-        (
-            name,
-            kategorie,
-            anzahl,
-            status,
-            ort,
-            notiz,
-            datum_bestellt,
-            datum_eingetroffen,
-            item_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
-    print("Artikel aktualisiert.")
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        print("Leer lassen oder '-' eingeben, um Feld unverändert zu lassen.")
+        name = input(f"Name [{item['name']}]: ").strip()
+        name = name if name and name != "-" else item['name']
+
+        cur.execute("SELECT id, name FROM categories ORDER BY name")
+        categories = {str(row[0]): row[1] for row in cur.fetchall()}
+        if not categories:
+            add_category("Standard")
+            categories = {"1": "Standard"}
+        
+        print("\nVerfügbare Kategorien:")
+        for cat_id, cat_name in categories.items():
+            print(f"{cat_id}: {cat_name}")
+        
+        cat_input = input(f"\nKategorie [{item.get('kategorie', 'Standard')}]: ").strip()
+        if cat_input and cat_input.isdigit() and cat_input in categories:
+            category_id = int(cat_input)
+        else:
+            category_id = item.get('category_id')
+
+        anzahl = input(f"Anzahl [{item['anzahl']}]: ").strip()
+        try:
+            anzahl = int(anzahl) if anzahl and anzahl != "-" else item['anzahl']
+        except ValueError:
+            print("Ungültige Anzahl, behalte alte Anzahl bei")
+            anzahl = item['anzahl']
+
+        status = get_status_from_input(item['status'], VALID_STATUS)
+
+        shop = input(f"Shop [{item.get('shop', '')}]: ").strip()
+        shop = shop if shop and shop != "-" else item.get('shop', '')
+
+        def validate_date(date_str: str) -> str:
+            if not date_str or date_str == "-":
+                return ""
+            try:
+                for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+                    try:
+                        return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
+                raise ValueError
+            except ValueError:
+                print("Datum muss Format YYYY-MM-DD oder DD.MM.YYYY haben (oder '-' für kein Datum)")
+                return None
+
+        while True:
+            datum_bestellt = input(f"Bestellt [{item.get('datum_bestellt', '')}]: ").strip()
+            if not datum_bestellt or datum_bestellt == "-":
+                datum_bestellt = item.get('datum_bestellt', '')
+                break
+            validated = validate_date(datum_bestellt)
+            if validated is not None:
+                datum_bestellt = validated
+                break
+
+        while True:
+            datum_eingetroffen = input(f"Eingetroffen [{item.get('datum_eingetroffen', '')}]: ").strip()
+            if not datum_eingetroffen or datum_eingetroffen == "-":
+                datum_eingetroffen = item.get('datum_eingetroffen', '')
+                break
+            validated = validate_date(datum_eingetroffen)
+            if validated is not None:
+                datum_eingetroffen = validated
+                break
+
+        notiz = input(f"Notiz [{item.get('notiz', '')}]: ").strip()
+        notiz = notiz if notiz and notiz != "-" else item.get('notiz', '')
+
+        # Update durchführen
+        cur.execute(
+            """
+            UPDATE items SET
+                name = ?,
+                category_id = ?,
+                anzahl = ?,
+                status = ?,
+                shop = ?,
+                notiz = ?,
+                datum_bestellt = ?,
+                datum_eingetroffen = ?
+            WHERE id = ?
+            """,
+            (
+                name,
+                category_id,
+                anzahl,
+                status,
+                shop,
+                notiz,
+                datum_bestellt,
+                datum_eingetroffen,
+                item_id,
+            ),
+        )
+        conn.commit()
+        print(f"Artikel {item_id} aktualisiert")
+
+    except Exception as e:
+        print(f"Fehler beim Aktualisieren: {str(e)}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 
 def remove_item(item_id: int) -> None:
@@ -194,52 +433,82 @@ def get_item(item_id: int) -> Optional[dict[str, Any]]:
     return dict(row) if row else None
 
 
-def add_item(data: dict[str, Any]) -> int:
-    """Fügt einen neuen Artikel hinzu und gibt die ID zurück."""
-    category_id = int(data["category_id"])
+def add_item(data: dict) -> int:
+    """Artikel hinzufügen."""
+    if not data.get("status"):
+        data["status"] = "bestellt"
+    elif data["status"] not in VALID_STATUS:
+        raise ValueError(f"Status muss einer von {VALID_STATUS} sein")
+
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT name FROM categories WHERE id=?", (category_id,))
-    row = cur.fetchone()
-    if not row:
-        raise ValueError("Kategorie existiert nicht")
-    category_name = row["name"]
+    try:
+        # Prüfe/Setze Kategorie
+        if not data.get("category_id"):
+            # Standardkategorie
+            cur.execute("SELECT id FROM categories WHERE name='Standard'")
+            result = cur.fetchone()
+            if result:
+                data["category_id"] = result[0]
+            else:
+                data["category_id"] = add_category("Standard")
 
-    validated = {
-        "name": ItemValidator.validate_name(data["name"]),
-        "kategorie": category_name,
-        "category_id": category_id,
-        "anzahl": ItemValidator.validate_amount(str(data["anzahl"])),
-        "status": ItemValidator.validate_status(data["status"]),
-        "ort": data.get("ort"),
-        "notiz": data.get("notiz"),
-        "datum_bestellt": ItemValidator.validate_date(data.get("datum_bestellt", "")) or None,
-        "datum_eingetroffen": ItemValidator.validate_date(
-            data.get("datum_eingetroffen", "")
-        ) or None,
-    }
-    cur.execute(
-        """
-        INSERT INTO items
-            (name, kategorie, category_id, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            validated["name"],
-            validated["kategorie"],
-            validated["category_id"],
-            validated["anzahl"],
-            validated["status"],
-            validated["ort"],
-            validated["notiz"],
-            validated["datum_bestellt"],
-            validated["datum_eingetroffen"],
-        ),
-    )
-    conn.commit()
-    new_id = cur.lastrowid
-    conn.close()
-    return new_id
+        # Hole Kategorie-Namen wenn nicht vorhanden
+        if not data.get("kategorie"):
+            cur.execute("SELECT name FROM categories WHERE id = ?", (data["category_id"],))
+            result = cur.fetchone()
+            if result:
+                data["kategorie"] = result[0]
+            else:
+                data["kategorie"] = "Standard"
+
+        # Validiere Pflichtfelder
+        if not data.get("name"):
+            raise ValueError("Name ist pflicht")
+            
+        # Validiere Datumsformate
+        for date_field in ["datum_bestellt", "datum_eingetroffen"]:
+            if data.get(date_field) == "-":
+                data[date_field] = ""
+            elif data.get(date_field):
+                try:
+                    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+                        try:
+                            date = datetime.strptime(data[date_field], fmt)
+                            data[date_field] = date.strftime("%Y-%m-%d")
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        raise ValueError
+                except ValueError:
+                    raise ValueError(f"Ungültiges Datumsformat für {date_field}")
+
+        cur.execute(
+            """
+            INSERT INTO items (
+                name, kategorie, category_id, status, shop,
+                notiz, datum_bestellt, datum_eingetroffen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["name"],
+                data["kategorie"],
+                data["category_id"],
+                data["status"],
+                data.get("shop", ""),
+                data.get("notiz", ""),
+                data.get("datum_bestellt", ""),
+                data.get("datum_eingetroffen", ""),
+            ),
+        )
+        
+        item_id = cur.lastrowid
+        conn.commit()
+        return item_id
+
+    finally:
+        conn.close()
 
 
 def update_item_fields(item_id: int, data: dict[str, Any]) -> None:
