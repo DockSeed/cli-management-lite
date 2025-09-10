@@ -172,7 +172,7 @@ def remove_item(item_id: int) -> None:
 
 def list_items(sort_by: str = "id", descending: bool = False) -> list[Any]:
     """Gibt alle Artikel sortiert nach ``sort_by`` zurück."""
-    allowed = {"id", "name", "status", "kategorie"}
+    allowed = {"id", "name", "status", "kategorie", "anzahl"}
     if sort_by not in allowed:
         sort_by = "id"
     order = "DESC" if descending else "ASC"
