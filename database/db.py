@@ -5,6 +5,8 @@ import time
 
 import logging
 
+from .migrations import run_migrations
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -16,29 +18,14 @@ def get_connection() -> sqlite3.Connection:
     """Return a SQLite connection with row access by name."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 def init_db() -> None:
-    """Initialise the database and create the ``items`` table if necessary."""
+    """Initialise the database and run migrations if necessary."""
     conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            kategorie TEXT NOT NULL,
-            anzahl INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            ort TEXT,
-            notiz TEXT,
-            datum_bestellt TEXT,
-            datum_eingetroffen TEXT
-        )
-        """
-    )
-    conn.commit()
+    run_migrations(conn)
     conn.close()
 
 

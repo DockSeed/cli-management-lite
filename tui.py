@@ -7,6 +7,7 @@ from textual.widgets import (
     DataTable,
     Input,
     Button,
+    Select,
 )
 from textual.screen import ModalScreen
 from modules import inventory
@@ -24,7 +25,10 @@ class ItemForm(ModalScreen):
         if self.item:
             yield Static(f"ID: {self.item['id']}", id="id_label")
         yield Input(value=self.item.get("name", ""), placeholder="Name", id="name")
-        yield Input(value=self.item.get("kategorie", ""), placeholder="Kategorie", id="kategorie")
+        categories = inventory.list_categories()
+        options = [(c["name"], str(c["id"])) for c in categories]
+        default = str(self.item.get("category_id", "")) if self.item.get("category_id") else None
+        yield Select(options=options, value=default, id="category_id")
         yield Input(value=str(self.item.get("anzahl", "")), placeholder="Anzahl", id="anzahl")
         yield Input(value=self.item.get("status", ""), placeholder="Status", id="status")
         yield Input(value=self.item.get("ort", "") or "", placeholder="Ort", id="ort")
@@ -44,7 +48,10 @@ class ItemForm(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save":
-            data = {widget.id: widget.value for widget in self.query(Input)}
+            widgets = list(self.query(Input)) + list(self.query(Select))
+            data = {w.id: w.value for w in widgets}
+            if data.get("category_id"):
+                data["category_id"] = int(data["category_id"])
             self.dismiss(data)
         else:
             self.dismiss(None)
@@ -54,12 +61,20 @@ class InventoryApp(App):
     """Einfache TUI für das Inventar."""
 
     CSS = """
-    Screen { layout: grid; grid-size: 2 3; grid-rows: 1fr 3 6; grid-columns: 25 1fr; }
+    Screen { layout: grid; grid-size: 2 3; grid-rows: 1fr 3 6; grid-columns: 1fr 3fr; }
     #menu { grid-row: 1; grid-column: 1; }
     #detail { grid-row: 1; grid-column: 2; }
     #search { grid-row: 2; grid-column: 1 / span 2; }
     #table { grid-row: 3; grid-column: 1 / span 2; height: 8; }
     #status { dock: bottom; height: 1; }
+
+    @media (max-width: 80) {
+        Screen { grid-size: 1 3; grid-columns: 1fr; }
+        #menu { display: none; }
+        #detail { grid-row: 1; grid-column: 1; }
+        #search { grid-row: 2; grid-column: 1; }
+        #table { grid-row: 3; grid-column: 1; }
+    }
     """
 
     BINDINGS = [
@@ -91,6 +106,8 @@ class InventoryApp(App):
         yield status
 
     def on_mount(self) -> None:
+        self.sort_by = "id"
+        self.descending = False
         table = self.query_one(DataTable)
         table.add_columns("ID", "Name", "Status")
         self.refresh_table()
@@ -100,7 +117,9 @@ class InventoryApp(App):
         table = self.query_one(DataTable)
         table.clear(True)
         rows = (
-            inventory.search_items(search) if search else inventory.list_items()
+            inventory.search_items(search)
+            if search
+            else inventory.list_items(self.sort_by, self.descending)
         )
         for row in rows:
             table.add_row(row["id"], row["name"], row["status"], key=row["id"])
@@ -155,6 +174,17 @@ class InventoryApp(App):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "search":
             self.refresh_table(event.value)
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
+        column = event.column_label.lower()
+        if column in {"id", "name", "status"}:
+            if getattr(self, "sort_by", "id") == column:
+                self.descending = not getattr(self, "descending", False)
+            else:
+                self.sort_by = column
+                self.descending = False
+            search = self.query_one("#search", Input).value
+            self.refresh_table(search)
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
         choice = event.item.query_one(Label).renderable
