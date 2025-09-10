@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 import sqlite3
 
 DB_PATH = Path(__file__).resolve().parent / "inventory.db"
@@ -10,7 +11,15 @@ def get_connection():
     return conn
 
 
-def init_db():
+def init_db(force: bool = False) -> None:
+    if DB_PATH.exists():
+        if not force:
+            return
+        confirm = input("Bestehende Datenbank überschreiben? (y/N) ")
+        if confirm.lower() != "y":
+            print("Abgebrochen.")
+            return
+        DB_PATH.unlink()
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -28,3 +37,17 @@ def init_db():
     )
     conn.commit()
     conn.close()
+
+
+def export_db(dest: str) -> None:
+    dest_path = Path(dest)
+    shutil.copy(DB_PATH, dest_path)
+
+
+def import_db(src: str) -> None:
+    src_path = Path(src)
+    if not src_path.exists():
+        raise FileNotFoundError(f"Quelle {src} existiert nicht")
+    if DB_PATH.exists():
+        shutil.copy(DB_PATH, DB_PATH.with_suffix(".bak"))
+    shutil.copy(src_path, DB_PATH)

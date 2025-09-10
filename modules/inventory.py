@@ -19,7 +19,12 @@ def add_item_interactive() -> None:
     item_id = input(f"ID [{next_id}]: ") or next_id
     name = input("Name: ")
     kategorie = input("Kategorie: ")
-    anzahl = int(input("Anzahl: "))
+    while True:
+        try:
+            anzahl = int(input("Anzahl: "))
+            break
+        except ValueError:
+            print("Bitte eine ganze Zahl eingeben")
     status = input("Status (bestellt, eingetroffen, verbaut, defekt): ")
     eingesetzt = input("Eingesetzt (optional): ") or None
     notiz = input("Notiz (optional): ") or None
@@ -56,10 +61,10 @@ def show_all_items() -> None:
         )
 
 
-def show_item_by_id(item_id: str) -> None:
+def show_item_by_id(item_id: int) -> None:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
+    cur.execute("SELECT * FROM items WHERE id=?", (f"{item_id:06d}",))
     row = cur.fetchone()
     conn.close()
     if row:
@@ -69,10 +74,11 @@ def show_item_by_id(item_id: str) -> None:
         print("Artikel nicht gefunden.")
 
 
-def update_item(item_id: str) -> None:
+def update_item(item_id: int) -> None:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
+    item_id_str = f"{item_id:06d}"
+    cur.execute("SELECT * FROM items WHERE id=?", (item_id_str,))
     row = cur.fetchone()
     if not row:
         print("Artikel nicht gefunden.")
@@ -81,32 +87,41 @@ def update_item(item_id: str) -> None:
     print("Leer lassen um Feld unverändert zu lassen.")
     name = input(f"Name [{row['name']}]: ") or row["name"]
     kategorie = input(f"Kategorie [{row['kategorie']}]: ") or row["kategorie"]
-    anzahl_input = input(f"Anzahl [{row['anzahl']}]: ")
-    anzahl = int(anzahl_input) if anzahl_input else row["anzahl"]
+    while True:
+        anzahl_input = input(f"Anzahl [{row['anzahl']}]: ")
+        if not anzahl_input:
+            anzahl = row["anzahl"]
+            break
+        try:
+            anzahl = int(anzahl_input)
+            break
+        except ValueError:
+            print("Bitte eine ganze Zahl eingeben")
     status = input(f"Status [{row['status']}]: ") or row["status"]
     eingesetzt = input(f"Eingesetzt [{row['eingesetzt'] or ''}]: ") or row["eingesetzt"]
     notiz = input(f"Notiz [{row['notiz'] or ''}]: ") or row["notiz"]
     cur.execute(
         "UPDATE items SET name=?, kategorie=?, anzahl=?, status=?, eingesetzt=?, notiz=? WHERE id=?",
-        (name, kategorie, anzahl, status, eingesetzt, notiz, item_id),
+        (name, kategorie, anzahl, status, eingesetzt, notiz, item_id_str),
     )
     conn.commit()
     conn.close()
     print("Artikel aktualisiert.")
 
 
-def remove_item(item_id: str) -> None:
+def remove_item(item_id: int) -> None:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT 1 FROM items WHERE id=?", (item_id,))
+    item_id_str = f"{item_id:06d}"
+    cur.execute("SELECT 1 FROM items WHERE id=?", (item_id_str,))
     row = cur.fetchone()
     if not row:
         print("Artikel nicht gefunden.")
         conn.close()
         return
-    confirm = input(f"Artikel {item_id} wirklich löschen? (y/N) ")
+    confirm = input(f"Artikel {item_id_str} wirklich löschen? (y/N) ")
     if confirm.lower() == "y":
-        cur.execute("DELETE FROM items WHERE id=?", (item_id,))
+        cur.execute("DELETE FROM items WHERE id=?", (item_id_str,))
         conn.commit()
         print("Artikel gelöscht.")
     else:

@@ -1,6 +1,8 @@
 import argparse
-from database.db import init_db
+from database.db import init_db, export_db, import_db
 from modules import inventory
+
+VERSION = "0.1"
 
 
 def add_command(_):
@@ -23,28 +25,55 @@ def remove_command(args):
     inventory.remove_item(args.id)
 
 
+def export_command(args):
+    export_db(args.file)
+    print(f"Datenbank nach {args.file} exportiert")
+
+
+def import_command(args):
+    import_db(args.file)
+    print(f"Datenbank aus {args.file} importiert")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CLI Warenwirtschaftssystem")
+    parser.add_argument("--version", action="version", version=VERSION)
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("add", help="Neuen Artikel hinzufügen").set_defaults(func=add_command)
     subparsers.add_parser("show", help="Alle Artikel anzeigen").set_defaults(func=show_command)
 
     show_id_parser = subparsers.add_parser("show-id", help="Artikel per ID anzeigen")
-    show_id_parser.add_argument("id", help="Artikel-ID")
+    show_id_parser.add_argument("id", type=int, help="Artikel-ID")
     show_id_parser.set_defaults(func=show_id_command)
 
     update_parser = subparsers.add_parser("update", help="Artikel aktualisieren")
-    update_parser.add_argument("id", help="Artikel-ID")
+    update_parser.add_argument("id", type=int, help="Artikel-ID")
     update_parser.set_defaults(func=update_command)
 
     remove_parser = subparsers.add_parser("remove", help="Artikel löschen")
-    remove_parser.add_argument("id", help="Artikel-ID")
+    remove_parser.add_argument("id", type=int, help="Artikel-ID")
     remove_parser.set_defaults(func=remove_command)
 
+    export_parser = subparsers.add_parser("export", help="Datenbank exportieren")
+    export_parser.add_argument("--file", default="inventory_backup.db", help="Zieldatei")
+    export_parser.set_defaults(func=export_command)
+
+    import_parser = subparsers.add_parser("import", help="Datenbank importieren")
+    import_parser.add_argument("--file", required=True, help="Quelldatei")
+    import_parser.set_defaults(func=import_command)
+
+    parser.add_argument("--init", action="store_true", help="Datenbank neu initialisieren")
+
     args = parser.parse_args()
-    if hasattr(args, "func"):
+    if args.init:
+        init_db(force=True)
+        if not hasattr(args, "func"):
+            return
+    else:
         init_db()
+
+    if hasattr(args, "func"):
         args.func(args)
     else:
         parser.print_help()

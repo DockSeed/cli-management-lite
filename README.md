@@ -41,6 +41,14 @@ wws-update: Bestehenden Artikel ändern (z. B. Status oder Anzahl)
 
 wws-remove: Artikel löschen (Abfrage ob wirklich löschen)
 
+wws-export [--file <Dateiname>]: Datenbank exportieren (Standard: inventory_backup.db)
+
+wws-import --file <Dateiname>: Datenbank importieren (bestehende Datenbank wird überschrieben, vorher Backup anlegen)
+
+wws --version: Aktuelle Programmversion anzeigen
+
+wws --init: Datenbank neu initialisieren (löscht bestehende Daten)
+
 Darstellung
 
 Ausgabe im Terminal als einfache ASCII-Tabelle
