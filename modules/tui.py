@@ -618,6 +618,11 @@ class InventoryApp(App):
                 return
             try:
                 inventory.remove_item_by_id(item_id)
+                # Bewegungen aus Bestandsdatenbank entfernen, um ID-Wiederverwendung sauber zu halten
+                try:
+                    stock.delete_movements_for_item(item_id)
+                except Exception:
+                    pass
                 # Nach dem Löschen Sequenz so anpassen, dass gelöschte höchste ID wiederverwendet wird
                 try:
                     conn = get_connection()

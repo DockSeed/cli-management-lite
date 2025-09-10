@@ -154,3 +154,14 @@ def get_low_stock_items(threshold: int = 5) -> list:
     
     finally:
         conn.close()
+
+
+def delete_movements_for_item(item_id: int) -> None:
+    """Entfernt alle Bewegungen für einen Artikel (bei Löschung des Artikels)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM stock_movements WHERE item_id = ?", (item_id,))
+        conn.commit()
+    finally:
+        conn.close()
