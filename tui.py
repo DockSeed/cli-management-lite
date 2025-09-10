@@ -64,8 +64,8 @@ class InventoryApp(App):
     Screen { layout: grid; grid-size: 2 3; grid-rows: 1fr 3 6; grid-columns: 1fr 3fr; }
     #menu { grid-row: 1; grid-column: 1; }
     #detail { grid-row: 1; grid-column: 2; }
-    #search { grid-row: 2; grid-column: 1 / span 2; }
-    #table { grid-row: 3; grid-column: 1 / span 2; height: 8; }
+    #search { grid-row: 2; grid-column: 1 / 3; }
+    #table { grid-row: 3; grid-column: 1 / 3; height: 8; }
     #status { dock: bottom; height: 1; }
 
     @media (max-width: 80) {
