@@ -70,3 +70,17 @@ Keine Benutzerverwaltung
 Keine komplexen Reportings
 
 Kein Netzwerkzugriff
+
+
+## TUI
+
+Für eine komfortablere Bedienung steht eine textbasierte Oberfläche zur Verfügung.
+Sie benötigt die Bibliothek `textual`, die über `pip install textual` installiert wird.
+Gestartet wird die Oberfläche mit:
+
+```bash
+python main.py tui
+```
+
+Navigiert wird mit den Pfeiltasten. `Tab` wechselt zwischen Menü und Artikelliste,
+`Enter` führt die Auswahl aus und `q` beendet die Anwendung.
