@@ -1,7 +1,7 @@
 # Dokumentation
 
 ## Installation
-Python 3.10 oder neuer wird benötigt. Es sind keine zusätzlichen Pakete erforderlich.
+Python 3.11 oder neuer wird benötigt. Die Pakete `textual` und `tabulate` werden bei Bedarf automatisch installiert oder können mit `pip install -r requirements.txt` vorab installiert werden.
 
 ## Nutzung
 

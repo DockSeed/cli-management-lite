@@ -1,32 +1,32 @@
-"""Grundlegende Datenbankoperationen für das Warenwirtschaftssystem."""
-from typing import Optional
+"""Datenbankoperationen für das CLI-Warenwirtschaftssystem."""
+from __future__ import annotations
+
+from typing import Any, Optional
+
 from database.db import get_connection
 
 
-def propose_id() -> str:
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT id FROM items ORDER BY id DESC LIMIT 1")
-    row = cur.fetchone()
-    conn.close()
-    next_id = 1 if row is None else int(row["id"]) + 1
-    return f"{next_id:06d}"
-
+# --- Interaktive CLI-Funktionen -------------------------------------------------
 
 def add_item_interactive() -> None:
+    """Interaktive Eingabe eines Artikels und Speicherung in der Datenbank."""
     conn = get_connection()
-    next_id = propose_id()
-    item_id = input(f"ID [{next_id}]: ") or next_id
     name = input("Name: ")
     kategorie = input("Kategorie: ")
     anzahl = int(input("Anzahl: "))
     status = input("Status (bestellt, eingetroffen, verbaut, defekt): ")
-    eingesetzt = input("Eingesetzt (optional): ") or None
+    ort = input("Ort (optional): ") or None
     notiz = input("Notiz (optional): ") or None
+    datum_bestellt = input("Datum bestellt (optional): ") or None
+    datum_eingetroffen = input("Datum eingetroffen (optional): ") or None
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO items (id, name, kategorie, anzahl, status, eingesetzt, notiz) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (item_id, name, kategorie, anzahl, status, eingesetzt, notiz),
+        """
+        INSERT INTO items
+            (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen),
     )
     conn.commit()
     conn.close()
@@ -34,6 +34,9 @@ def add_item_interactive() -> None:
 
 
 def show_all_items() -> None:
+    """Gibt alle Artikel als ASCII-Tabelle aus."""
+    from tabulate import tabulate
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, name, kategorie, anzahl, status FROM items")
@@ -42,21 +45,12 @@ def show_all_items() -> None:
     if not rows:
         print("Keine Artikel gefunden.")
         return
-    widths = [6, 20, 15, 6, 10]
-    headers = ("ID", "Name", "Kategorie", "Anz", "Status")
-    line = " | ".join(h.ljust(w) for h, w in zip(headers, widths))
-    print(line)
-    print("-" * len(line))
-    for r in rows:
-        print(
-            " | ".join(
-                str(r[c]).ljust(w)
-                for c, w in zip(("id", "name", "kategorie", "anzahl", "status"), widths)
-            )
-        )
+    table = tabulate(rows, headers="keys", tablefmt="github")
+    print(table)
 
 
-def show_item_by_id(item_id: str) -> None:
+def show_item_by_id(item_id: int) -> None:
+    """Zeigt alle Informationen zu einem Artikel."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
@@ -69,7 +63,8 @@ def show_item_by_id(item_id: str) -> None:
         print("Artikel nicht gefunden.")
 
 
-def update_item(item_id: str) -> None:
+def update_item(item_id: int) -> None:
+    """Interaktives Bearbeiten eines Artikels."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM items WHERE id=?", (item_id,))
@@ -78,24 +73,44 @@ def update_item(item_id: str) -> None:
         print("Artikel nicht gefunden.")
         conn.close()
         return
-    print("Leer lassen um Feld unverändert zu lassen.")
+    print("Leer lassen, um Feld unverändert zu lassen.")
     name = input(f"Name [{row['name']}]: ") or row["name"]
     kategorie = input(f"Kategorie [{row['kategorie']}]: ") or row["kategorie"]
     anzahl_input = input(f"Anzahl [{row['anzahl']}]: ")
     anzahl = int(anzahl_input) if anzahl_input else row["anzahl"]
     status = input(f"Status [{row['status']}]: ") or row["status"]
-    eingesetzt = input(f"Eingesetzt [{row['eingesetzt'] or ''}]: ") or row["eingesetzt"]
+    ort = input(f"Ort [{row['ort'] or ''}]: ") or row["ort"]
     notiz = input(f"Notiz [{row['notiz'] or ''}]: ") or row["notiz"]
+    datum_bestellt = input(f"Bestellt [{row['datum_bestellt'] or ''}]: ") or row["datum_bestellt"]
+    datum_eingetroffen = input(
+        f"Eingetroffen [{row['datum_eingetroffen'] or ''}]: "
+    ) or row["datum_eingetroffen"]
     cur.execute(
-        "UPDATE items SET name=?, kategorie=?, anzahl=?, status=?, eingesetzt=?, notiz=? WHERE id=?",
-        (name, kategorie, anzahl, status, eingesetzt, notiz, item_id),
+        """
+        UPDATE items SET
+            name=?, kategorie=?, anzahl=?, status=?, ort=?, notiz=?,
+            datum_bestellt=?, datum_eingetroffen=?
+        WHERE id=?
+        """,
+        (
+            name,
+            kategorie,
+            anzahl,
+            status,
+            ort,
+            notiz,
+            datum_bestellt,
+            datum_eingetroffen,
+            item_id,
+        ),
     )
     conn.commit()
     conn.close()
     print("Artikel aktualisiert.")
 
 
-def remove_item(item_id: str) -> None:
+def remove_item(item_id: int) -> None:
+    """Löscht einen Artikel nach Bestätigung."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM items WHERE id=?", (item_id,))
@@ -114,10 +129,10 @@ def remove_item(item_id: str) -> None:
     conn.close()
 
 
-# Backend-Funktionen für die TUI
+# --- Backend-Funktionen für die TUI --------------------------------------------
 
-def list_items() -> list:
-    """Gibt alle Artikel als Liste von Zeilen zurück."""
+def list_items() -> list[Any]:
+    """Gibt alle Artikel sortiert nach ID zurück."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM items ORDER BY id")
@@ -126,7 +141,7 @@ def list_items() -> list:
     return rows
 
 
-def get_item(item_id: str) -> Optional[dict]:
+def get_item(item_id: int) -> Optional[dict[str, Any]]:
     """Liefert einen Artikel als Dictionary oder ``None``."""
     conn = get_connection()
     cur = conn.cursor()
@@ -136,40 +151,53 @@ def get_item(item_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
-def add_item(data: dict) -> None:
-    """Fügt einen neuen Artikel mit den übergebenen Daten hinzu."""
+def add_item(data: dict[str, Any]) -> int:
+    """Fügt einen neuen Artikel hinzu und gibt die ID zurück."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO items (id, name, kategorie, anzahl, status, eingesetzt, notiz) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        """
+        INSERT INTO items
+            (name, kategorie, anzahl, status, ort, notiz, datum_bestellt, datum_eingetroffen)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
         (
-            data["id"],
             data["name"],
             data["kategorie"],
             int(data["anzahl"]),
             data["status"],
-            data.get("eingesetzt"),
+            data.get("ort"),
             data.get("notiz"),
+            data.get("datum_bestellt"),
+            data.get("datum_eingetroffen"),
         ),
     )
     conn.commit()
+    new_id = cur.lastrowid
     conn.close()
+    return new_id
 
 
-def update_item_fields(item_id: str, data: dict) -> None:
+def update_item_fields(item_id: int, data: dict[str, Any]) -> None:
     """Aktualisiert die angegebenen Felder eines Artikels."""
     if not data:
         return
     conn = get_connection()
     cur = conn.cursor()
-    fields = ", ".join(f"{k}=?" for k in data.keys())
-    values = list(data.values()) + [item_id]
-    cur.execute(f"UPDATE items SET {fields} WHERE id=?", values)
+    fields = []
+    values: list[Any] = []
+    for key, value in data.items():
+        if key == "anzahl" and value is not None:
+            value = int(value)
+        fields.append(f"{key}=?")
+        values.append(value)
+    values.append(item_id)
+    cur.execute(f"UPDATE items SET {', '.join(fields)} WHERE id=?", values)
     conn.commit()
     conn.close()
 
 
-def remove_item_by_id(item_id: str) -> None:
+def remove_item_by_id(item_id: int) -> None:
     """Löscht einen Artikel anhand seiner ID."""
     conn = get_connection()
     cur = conn.cursor()

@@ -1,86 +1,47 @@
-Projektname
+# CLI Management Lite
 
-CLI Warenwirtschaftssytem
+Ein leichtgewichtiges Warenwirtschaftssystem (WWS) für Bastel- und Elektronikkomponenten. Die Anwendung läuft rein lokal und kann sowohl über die Kommandozeile als auch über eine Textoberfläche (TUI) bedient werden.
 
-Hintergrund
-
-Das Team benötigt ein leichtgewichtiges Werkzeug, um Bastel- und Elektronikbauteile (z. B. ESP32-Boards, Sensoren) im Inventar zu verwalten.
-Das Tool soll lokal laufen, ohne komplexe Server oder Web-GUIs. Es muss minimal, verständlich und erweiterbar sein.
-
-Anforderungen:
-
-Datenhaltung
-
-Eine kleine SQLite-Datenbank (inventory.db innerhalb des Ordners Database)
-
-Tabelle items mit Spalten:
-
-id (6 Stellig fortlaufend, vorschlag wir gegeben kann aber überschrieben werden sofern gültiger eintrag. (vergabe eigener ID))
-
-name (Text)
-
-kategorie (Text) bzw warengruppe
-
-anzahl (Zahl)
-
-status (bestellt, eingetroffen, verbaut, defekt)
-
- bei status verbaut, eingesetzt (welches Projekt) (Text, optional)
-
-notiz (Text, optional)
-
-Kommandozeilenbefehle:
-
-wws-add: Neuen Artikel hinzufügen (Alle Felder sollen nacheinander ausgefüllt werden, überspringen mit Enter nur bei optionalen Angaben wie Notiz und Einsatzort)
-
-wws-show: Tabelle mit allen Artikeln anzeigen
-
-wws-show-id 000001 Zeigt jeweilige id mit allen infos
-
-wws-update: Bestehenden Artikel ändern (z. B. Status oder Anzahl)
-
-wws-remove: Artikel löschen (Abfrage ob wirklich löschen)
-
-wws-export [--file <Dateiname>]: Datenbank exportieren (Standard: inventory_backup.db)
-
-wws-import --file <Dateiname>: Datenbank importieren (bestehende Datenbank wird überschrieben, vorher Backup anlegen)
-
-wws --version: Aktuelle Programmversion anzeigen
-
-Darstellung
-
-Ausgabe im Terminal als einfache ASCII-Tabelle
-
-Klarer Fokus auf Lesbarkeit
-
-Technik
-
-Sprache: Python
-
-Standardbibliothek verwenden (keine externen Dependencies im MVP)
-
-Plattform: Linux (Debian-basiert, CLI)
-
-Nicht-Ziele (jetzt erstmal nicht)
-
-Kein Web-Frontend
-
-Keine Benutzerverwaltung
-
-Keine komplexen Reportings
-
-Kein Netzwerkzugriff
-
-
-## TUI
-
-Für eine komfortablere Bedienung steht eine textbasierte Oberfläche zur Verfügung.
-Sie benötigt die Bibliothek `textual`, die über `pip install textual` installiert wird.
-Gestartet wird die Oberfläche mit:
+## Quickstart
 
 ```bash
+git clone https://github.com/DockSeed/cli-management-lite.git
+cd cli-management-lite
 python main.py tui
 ```
 
-Navigiert wird mit den Pfeiltasten. `Tab` wechselt zwischen Menü und Artikelliste,
-`Enter` führt die Auswahl aus und `q` beendet die Anwendung.
+Die benötigten Pakete `textual` und `tabulate` werden beim ersten Start automatisch installiert. Alternativ können sie auch über `pip install -r requirements.txt` vorab installiert werden.
+
+## Nutzung
+
+- `python main.py add` – neuen Artikel interaktiv anlegen
+- `python main.py show` – Tabelle aller Artikel anzeigen
+- `python main.py show-id <ID>` – Details zu einem Artikel anzeigen
+- `python main.py update <ID>` – Artikel bearbeiten
+- `python main.py remove <ID>` – Artikel löschen
+- `python main.py tui` – Textoberfläche starten
+
+## TUI
+
+```
+┌───────────────┬─────────────────────────────┐
+│ Menü          │ Artikel-Details             │
+│ > Add         │ ID: 3                       │
+│   Update      │ Name: ESP32-WROOM           │
+│   Remove      │ Kategorie: MCU              │
+│   Show        │ Anzahl: 5                   │
+│   Quit        │ Status: eingetroffen        │
+│               │ Ort: Schublade A2           │
+│ Artikel:      │ Notiz: AliExpress           │
+│ [1] ESP32-S3  │ Bestellt: 2025-09-01        │
+│ [2] DHT22     │ Eingetroffen: 2025-09-09    │
+│ [3] ESP32-WR… │                             │
+└───────────────┴─────────────────────────────┘
+Status: [↑↓] Navigieren | [Tab] Wechseln | [Enter] Ausführen | [q] Beenden
+```
+
+Die TUI synchronisiert die Artikelliste mit der Detailansicht. Navigation erfolgt mit den Pfeiltasten, `Tab` wechselt den Fokus, `Enter` führt Aktionen aus, `q` beendet.
+
+## Lizenz
+
+MIT
