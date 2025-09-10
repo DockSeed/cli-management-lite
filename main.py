@@ -1,6 +1,8 @@
 import argparse
-from database.db import init_db
+from database.db import init_db, export_db, import_db
 from modules import inventory
+
+VERSION = "0.1"
 
 
 def add_command(_):
@@ -23,8 +25,19 @@ def remove_command(args):
     inventory.remove_item(args.id)
 
 
+def export_command(args):
+    export_db(args.file)
+    print(f"Datenbank nach {args.file} exportiert")
+
+
+def import_command(args):
+    import_db(args.file)
+    print(f"Datenbank aus {args.file} importiert")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CLI Warenwirtschaftssystem")
+    parser.add_argument("--version", action="version", version=VERSION)
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("add", help="Neuen Artikel hinzufügen").set_defaults(func=add_command)
@@ -41,6 +54,14 @@ def main() -> None:
     remove_parser = subparsers.add_parser("remove", help="Artikel löschen")
     remove_parser.add_argument("id", help="Artikel-ID")
     remove_parser.set_defaults(func=remove_command)
+
+    export_parser = subparsers.add_parser("export", help="Datenbank exportieren")
+    export_parser.add_argument("--file", default="inventory_backup.db", help="Zieldatei")
+    export_parser.set_defaults(func=export_command)
+
+    import_parser = subparsers.add_parser("import", help="Datenbank importieren")
+    import_parser.add_argument("--file", required=True, help="Quelldatei")
+    import_parser.set_defaults(func=import_command)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
