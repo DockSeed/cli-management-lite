@@ -289,7 +289,64 @@ def remove_item_by_id(item_id: int) -> None:
 
 
 def search_items(search_term: str) -> list[dict]:
-    """Suche in Name, Kategorie, Status, Notizen und Ort."""
+    """Full-text search with FTS5 and LIKE fallback."""
+    if not search_term.strip():
+        return list_items()
+
+    # Try FTS first
+    fts_results = search_items_fts(search_term)
+    if fts_results:
+        return fts_results
+
+    # Fallback to LIKE search
+    return search_items_like(search_term)
+
+
+def search_items_fts(search_term: str) -> list[dict]:
+    """Advanced FTS5 search with ranking."""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    escaped_term = search_term.replace('"', '""')
+
+    try:
+        cur.execute(
+            """
+            SELECT items.*, items_fts.rank
+            FROM items_fts 
+            JOIN items ON items.id = items_fts.rowid
+            WHERE items_fts MATCH ?
+            ORDER BY items_fts.rank
+            LIMIT 50
+            """,
+            (escaped_term,),
+        )
+        results = cur.fetchall()
+
+        if not results and not any(op in search_term for op in ['"', '*', 'OR', 'AND']):
+            wildcard_term = f"{escaped_term}*"
+            cur.execute(
+                """
+                SELECT items.*, items_fts.rank
+                FROM items_fts 
+                JOIN items ON items.id = items_fts.rowid
+                WHERE items_fts MATCH ?
+                ORDER BY items_fts.rank
+                LIMIT 50
+                """,
+                (wildcard_term,),
+            )
+            results = cur.fetchall()
+
+    except Exception:
+        results = []
+
+    conn.close()
+    return [dict(row) for row in results]
+
+
+def search_items_like(search_term: str) -> list[dict]:
+    """Fallback LIKE search (original implementation)."""
     conn = get_connection()
     cur = conn.cursor()
     pattern = f"%{search_term}%"

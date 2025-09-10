@@ -88,7 +88,10 @@ class InventoryApp(App):
             id="menu",
         )
         detail = Static("", id="detail")
-        search = Input(placeholder="Suche", id="search")
+        search = Input(
+            placeholder="Search: 'exact phrase', wildcard*, ESP32 OR Arduino",
+            id="search",
+        )
         table = DataTable(id="table")
         status = Static("", id="status")
         yield menu
@@ -107,7 +110,8 @@ class InventoryApp(App):
 
     def refresh_table(self, search: str = "") -> None:
         table = self.query_one(DataTable)
-        table.clear(True)
+        # Clear existing rows but keep column definitions intact
+        table.clear()
         rows = (
             inventory.search_items(search)
             if search
@@ -165,7 +169,15 @@ class InventoryApp(App):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "search":
-            self.refresh_table(event.value)
+            search_term = event.value.strip()
+            status = self.query_one("#status", Static)
+            if any(op in search_term for op in ['"', '*', 'OR', 'AND', 'NOT']):
+                status.update("FTS Search Active")
+            elif search_term:
+                status.update(f"Searching: {search_term}")
+            else:
+                status.update("")
+            self.refresh_table(search_term)
 
     def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
         column = event.column_label.lower()
@@ -179,7 +191,8 @@ class InventoryApp(App):
             self.refresh_table(search)
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
-        choice = event.item.query_one(Label).renderable
+        # Obtain the label text for the selected menu item
+        choice = str(event.item.query_one(Label).render())
         status = self.query_one("#status", Static)
         if choice == "Quit":
             self.exit()
