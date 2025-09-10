@@ -1,4 +1,20 @@
 import argparse
+import importlib
+import subprocess
+import sys
+
+
+def ensure_dependencies() -> None:
+    """Install benötigte Pakete automatisch, falls sie fehlen."""
+    for package in ("textual", "tabulate"):
+        try:
+            importlib.import_module(package)
+        except ImportError:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+
+ensure_dependencies()
+
 from database.db import init_db, export_db, import_db
 from modules import inventory
 import tui
@@ -50,15 +66,15 @@ def main() -> None:
     subparsers.add_parser("show", help="Alle Artikel anzeigen").set_defaults(func=show_command)
 
     show_id_parser = subparsers.add_parser("show-id", help="Artikel per ID anzeigen")
-    show_id_parser.add_argument("id", help="Artikel-ID")
+    show_id_parser.add_argument("id", type=int, help="Artikel-ID")
     show_id_parser.set_defaults(func=show_id_command)
 
     update_parser = subparsers.add_parser("update", help="Artikel aktualisieren")
-    update_parser.add_argument("id", help="Artikel-ID")
+    update_parser.add_argument("id", type=int, help="Artikel-ID")
     update_parser.set_defaults(func=update_command)
 
     remove_parser = subparsers.add_parser("remove", help="Artikel löschen")
-    remove_parser.add_argument("id", help="Artikel-ID")
+    remove_parser.add_argument("id", type=int, help="Artikel-ID")
     remove_parser.set_defaults(func=remove_command)
 
     export_parser = subparsers.add_parser("export", help="Datenbank exportieren")

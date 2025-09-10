@@ -1,5 +1,13 @@
 from textual.app import App, ComposeResult
-from textual.widgets import ListView, ListItem, Label, Static, DataTable, Input, Button
+from textual.widgets import (
+    ListView,
+    ListItem,
+    Label,
+    Static,
+    DataTable,
+    Input,
+    Button,
+)
 from textual.screen import ModalScreen
 from modules import inventory
 
@@ -13,20 +21,30 @@ class ItemForm(ModalScreen):
 
     def compose(self) -> ComposeResult:
         yield Static("Artikel", classes="title")
-        yield Input(value=self.item.get("id", inventory.propose_id()), placeholder="ID", id="id")
+        if self.item:
+            yield Static(f"ID: {self.item['id']}", id="id_label")
         yield Input(value=self.item.get("name", ""), placeholder="Name", id="name")
         yield Input(value=self.item.get("kategorie", ""), placeholder="Kategorie", id="kategorie")
         yield Input(value=str(self.item.get("anzahl", "")), placeholder="Anzahl", id="anzahl")
         yield Input(value=self.item.get("status", ""), placeholder="Status", id="status")
-        yield Input(value=self.item.get("eingesetzt", "") or "", placeholder="Eingesetzt", id="eingesetzt")
+        yield Input(value=self.item.get("ort", "") or "", placeholder="Ort", id="ort")
         yield Input(value=self.item.get("notiz", "") or "", placeholder="Notiz", id="notiz")
+        yield Input(
+            value=self.item.get("datum_bestellt", "") or "",
+            placeholder="Datum bestellt",
+            id="datum_bestellt",
+        )
+        yield Input(
+            value=self.item.get("datum_eingetroffen", "") or "",
+            placeholder="Datum eingetroffen",
+            id="datum_eingetroffen",
+        )
         yield Button("Speichern", id="save")
         yield Button("Abbrechen", id="cancel")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save":
             data = {widget.id: widget.value for widget in self.query(Input)}
-            data["anzahl"] = int(data.get("anzahl") or 0)
             self.dismiss(data)
         else:
             self.dismiss(None)
@@ -79,7 +97,7 @@ class InventoryApp(App):
 
     def show_details(self, item_id: str) -> None:
         detail = self.query_one("#detail", Static)
-        item = inventory.get_item(item_id)
+        item = inventory.get_item(int(item_id))
         if item:
             lines = [f"{k}: {v}" for k, v in item.items()]
             detail.update("\n".join(lines))
@@ -110,11 +128,10 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = table.row_keys[table.cursor_row]
+            item_id = int(table.row_keys[table.cursor_row])
             item = inventory.get_item(item_id)
             data = await self.push_screen(ItemForm(item))
             if data:
-                item_id = data.pop("id")
                 inventory.update_item_fields(item_id, data)
                 self.refresh_table()
                 status.update("Artikel aktualisiert")
@@ -123,7 +140,7 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = table.row_keys[table.cursor_row]
+            item_id = int(table.row_keys[table.cursor_row])
             inventory.remove_item_by_id(item_id)
             self.refresh_table()
             status.update("Artikel gelöscht")
@@ -132,11 +149,11 @@ class InventoryApp(App):
             if table.cursor_row is None:
                 status.update("Kein Artikel gewählt")
                 return
-            item_id = table.row_keys[table.cursor_row]
+            item_id = int(table.row_keys[table.cursor_row])
             self.show_details(item_id)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.show_details(event.row_key)
+        self.show_details(int(event.row_key))
 
 
 def main() -> None:
