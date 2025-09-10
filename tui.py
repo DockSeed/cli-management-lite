@@ -62,10 +62,10 @@ class InventoryApp(App):
 
     CSS = """
     Screen { layout: grid; grid-size: 2 3; grid-rows: 1fr 3 6; grid-columns: 1fr 3fr; }
-    #menu { grid-column: 1; grid-row: 1; }
-    #detail { grid-column: 2; grid-row: 1; }
-    #search { grid-row: 2; grid-column-span: 2; }
-    #table { grid-row: 3; grid-column-span: 2; height: 8; }
+    #menu { }
+    #detail { }
+    #search { column-span: 2; }
+    #table { column-span: 2; height: 8; }
     #status { dock: bottom; height: 1; }
     """
 
