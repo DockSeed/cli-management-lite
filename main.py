@@ -41,14 +41,21 @@ def import_command(args):
 
 
 def tui_command(_):
-    try:
-        import tui
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("textual") is None:
         print(
             "Das Paket 'textual' ist nicht installiert. "
             "Installieren Sie es mit 'pip install textual'."
         )
         return
+
+    try:
+        import tui
+    except ImportError as exc:
+        print(f"TUI konnte nicht geladen werden: {exc}")
+        return
+
     init_db()
     tui.main()
 
