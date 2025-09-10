@@ -25,13 +25,13 @@ anzahl (Zahl)
 
 status (bestellt, eingetroffen, verbaut, defekt)
 
-bei status verbaut, wo (welches Projekt) (Text, optional)
+ bei status verbaut, eingesetzt (welches Projekt) (Text, optional)
 
 notiz (Text, optional)
 
 Kommandozeilenbefehle:
 
-wws-add: Neuen Artikel hinzufügen (Alle Felder sollen nacheinander ausgefüllt werden, überspringen mit Enter nur bei optionalen Angaben wie Notiz und Einsatz)
+wws-add: Neuen Artikel hinzufügen (Alle Felder sollen nacheinander ausgefüllt werden, überspringen mit Enter nur bei optionalen Angaben wie Notiz und Einsatzort)
 
 wws-show: Tabelle mit allen Artikeln anzeigen
 
